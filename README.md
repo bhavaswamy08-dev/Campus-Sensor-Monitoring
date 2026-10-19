@@ -1,219 +1,246 @@
 # Campus Sensor Monitoring and Alerts
 
-A small, beginner-friendly backend that receives campus sensor readings
-(temperature, air quality, occupancy), evaluates them against alert rules, and
-lets organizers manage the resulting alerts.
+A backend service that receives campus sensor readings, evaluates alert rules, and allows organizers to manage alerts.
 
-Built with Python 3.14, FastAPI, SQLite (standard library `sqlite3`), Uvicorn and Pytest.
+**Technology stack:** Python 3.14, FastAPI, SQLite, Uvicorn, and Pytest.
 
-## Files
+## Features
 
-| File | Purpose |
-|------|---------|
-| `main.py` | FastAPI app: validation, endpoints, rule evaluation |
-| `database.py` | SQLite connection, transaction helper, schema |
-| `sensor_simulator.py` | Generates realistic readings, including alert-triggering ones |
-| `load_test.py` | Concurrent load generator that measures real results |
-| `test_main.py` | Automated tests |
-| `requirements.txt` | Dependencies |
+* Accept individual sensor readings and batches.
+* Support temperature, air-quality, and occupancy readings.
+* Create, edit, enable, and disable alert rules.
+* Support single-reading threshold rules.
+* Support time-window average rules.
+* Automatically generate alerts when rules are triggered.
+* List, acknowledge, and resolve alerts.
+* Simulate sensor readings for testing.
+* Measure request throughput, reading throughput, and latency.
 
-## Setup
+## Project Structure
 
-```bash
-python3.14 -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+| File                  | Purpose                                            |
+| --------------------- | -------------------------------------------------- |
+| `main.py`             | FastAPI application and API endpoints              |
+| `database.py`         | SQLite database and schema                         |
+| `sensor_simulator.py` | Generates sample sensor readings                   |
+| `load_test.py`        | Sends concurrent requests and measures performance |
+| `test_main.py`        | Automated tests                                    |
+| `requirements.txt`    | Project dependencies                               |
+| `README.md`           | Documentation and instructions                     |
 
-## Start the server
+## Installation
 
-```bash
-uvicorn main:app --reload
-```
+Install Python and open a terminal in the project directory.
 
-The server runs at http://127.0.0.1:8000. Interactive docs are at `/docs`.
-The database file `campus_sensors.db` is created automatically. Set a different
-path with the `CAMPUS_DB_PATH` environment variable.
-
-## Run the tests
+Install the dependencies:
 
 ```bash
-pytest -v
+py -3.14 -m pip install -r requirements.txt
 ```
 
-Tests use a temporary database, so they never touch your real data.
+## Run the Application
 
-## Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Liveness check |
-| POST | `/readings` | Submit one reading |
-| POST | `/readings/batch` | Submit 1-1000 readings (all-or-nothing) |
-| GET | `/readings?sensorId=&type=&limit=` | List recent readings |
-| POST | `/rules` | Create a rule |
-| GET | `/rules?enabled=true` | List rules |
-| GET | `/rules/{id}` | Get one rule |
-| PATCH | `/rules/{id}` | Edit a rule (partial update) |
-| POST | `/rules/{id}/enable` | Enable a rule |
-| POST | `/rules/{id}/disable` | Disable a rule |
-| GET | `/alerts?status=&ruleId=&sensorId=&limit=` | List alerts |
-| GET | `/alerts/{id}` | Get one alert |
-| POST | `/alerts/{id}/acknowledge` | open -> acknowledged |
-| POST | `/alerts/{id}/resolve` | open/acknowledged -> resolved |
-
-## Example requests
-
-Submit a reading (`timestamp` is ISO 8601; optional, defaults to now; naive times are treated as UTC):
+Start the server:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/readings -H "Content-Type: application/json" \
-  -d '{"sensorId":"temp-hall-3","type":"temperature","value":31.4,"timestamp":"2026-01-01T10:05:00Z"}'
+py -3.14 -m uvicorn main:app --reload
 ```
 
-Submit a batch:
+The application runs at:
 
-```bash
-curl -X POST http://127.0.0.1:8000/readings/batch -H "Content-Type: application/json" \
-  -d '{"readings":[
-        {"sensorId":"temp-1","type":"temperature","value":22.5},
-        {"sensorId":"aq-1","type":"air_quality","value":48}]}'
-```
+`http://127.0.0.1:8000`
 
-Create a single-reading threshold rule (temperature > 30):
+Interactive API documentation:
 
-```bash
-curl -X POST http://127.0.0.1:8000/rules -H "Content-Type: application/json" \
-  -d '{"name":"High temperature","sensorType":"temperature","ruleType":"threshold",
-       "operator":"gt","threshold":30,"severity":"critical"}'
-```
+`http://127.0.0.1:8000/docs`
 
-Create a time-window rule (average temperature > 28 over the previous 10 minutes,
-needing at least 3 readings):
+Health check:
 
-```bash
-curl -X POST http://127.0.0.1:8000/rules -H "Content-Type: application/json" \
-  -d '{"name":"Sustained heat","sensorType":"temperature","ruleType":"window_average",
-       "operator":"gt","threshold":28,"windowMinutes":10,"minSamples":3}'
-```
+`http://127.0.0.1:8000/health`
 
-Rule fields: `name`, `sensorType`, `sensorId` (optional; omit to apply to every sensor of that type),
-`ruleType` (`threshold` | `window_average`), `operator` (`gt`, `gte`, `lt`, `lte`), `threshold`,
-`windowMinutes` (required only for window rules), `minSamples` (default 3), `severity`
-(`info` | `warning` | `critical`), `enabled`.
+## API Endpoints
 
-Edit, disable, enable:
+| Method | Endpoint                   | Description                  |
+| ------ | -------------------------- | ---------------------------- |
+| GET    | `/health`                  | Check application health     |
+| POST   | `/readings`                | Submit an individual reading |
+| POST   | `/readings/batch`          | Submit a batch of readings   |
+| GET    | `/readings`                | Retrieve readings            |
+| POST   | `/rules`                   | Create an alert rule         |
+| GET    | `/rules`                   | List alert rules             |
+| GET    | `/rules/{id}`              | Retrieve a specific rule     |
+| PATCH  | `/rules/{id}`              | Edit a rule                  |
+| POST   | `/rules/{id}/enable`       | Enable a rule                |
+| POST   | `/rules/{id}/disable`      | Disable a rule               |
+| GET    | `/alerts`                  | List alerts                  |
+| GET    | `/alerts/{id}`             | Retrieve a specific alert    |
+| POST   | `/alerts/{id}/acknowledge` | Acknowledge an alert         |
+| POST   | `/alerts/{id}/resolve`     | Resolve an alert             |
 
-```bash
-curl -X PATCH http://127.0.0.1:8000/rules/1 -H "Content-Type: application/json" -d '{"threshold":32}'
-curl -X POST http://127.0.0.1:8000/rules/1/disable
-curl -X POST http://127.0.0.1:8000/rules/1/enable
-```
-
-Work with alerts:
-
-```bash
-curl "http://127.0.0.1:8000/alerts?status=open"
-curl -X POST http://127.0.0.1:8000/alerts/1/acknowledge
-curl -X POST http://127.0.0.1:8000/alerts/1/resolve
-```
-
-Validation errors return HTTP 422, for example:
+## Example Sensor Reading
 
 ```json
-{"detail": "Validation failed",
- "errors": [{"location": "body.value", "message": "Input should be a valid number, unable to parse string as a number"}]}
+{
+  "sensorId": "library-floor-2",
+  "type": "temperature",
+  "value": 34.5,
+  "timestamp": "2026-10-19T10:30:00Z"
+}
 ```
 
-## Sensor simulator
+Submit the JSON through `POST /readings` in the interactive API documentation.
 
-With the server running, in a second terminal:
+**Note:** The timestamp must satisfy the API's validation rules.
+
+## Sensor Simulator
+
+With the server running, open a second terminal and execute:
 
 ```bash
-python sensor_simulator.py                 # creates sample rules, sends 30 rounds with anomalies
-python sensor_simulator.py --no-anomalies  # normal readings only
-python sensor_simulator.py --help
+py -3.14 sensor_simulator.py
 ```
 
-It simulates 3 temperature sensors, 2 air-quality sensors and 2 occupancy sensors.
-Unless `--no-anomalies` is set it includes a one-off temperature spike, a sustained
-heat wave on one sensor, an air-quality event and a room exceeding capacity.
-Then check `GET /alerts`.
+The simulator generates sensor readings, including abnormal readings that can trigger alerts.
 
-## Performance testing
+## Automated Tests
 
-Use a throwaway database so test data does not pollute your real one:
+Run the test suite:
 
 ```bash
-CAMPUS_DB_PATH=load_test.db uvicorn main:app          # terminal 1 (no --reload)
-python load_test.py                                   # terminal 2: 10,000 single requests
-python load_test.py --concurrency 100                 # more parallel connections
-python load_test.py --batch-size 100                  # 100 batch requests of 100 readings
+py -3.14 -m pytest -v
 ```
 
-The script prints elapsed time, successful and failed requests, accepted readings,
-throughput and latency percentiles. **All numbers come from your own run;
-this README intentionally contains no benchmark results.** Results depend on your
-hardware, disk, Python version and the number of enabled rules. The script exits
-with a non-zero code if any request fails.
+**Observed result:** 22 tests passed, with 1 warning.
+
+The warning concerned the deprecated `httpx` integration with Starlette's test client. The tests completed successfully.
+
+## Load Testing
+
+The load-testing script sends sensor readings to the running API and reports elapsed time, accepted readings, request throughput, reading throughput, and latency percentiles.
+
+### Test 1: Individual Requests
+
+| Metric              |                Result |
+| ------------------- | --------------------: |
+| Readings submitted  |                10,000 |
+| Successful requests |                10,000 |
+| Failed requests     |                     0 |
+| Elapsed time        |         66.11 seconds |
+| Request throughput  | 151.3 requests/second |
+| Reading throughput  | 151.3 readings/second |
+
+### Test 2: Batch Requests
+
+| Metric              |                  Result |
+| ------------------- | ----------------------: |
+| Readings submitted  |                  10,000 |
+| Successful requests |                     100 |
+| Failed requests     |                       0 |
+| Batch size          |            100 readings |
+| Elapsed time        |            2.48 seconds |
+| Request throughput  |    40.3 requests/second |
+| Reading throughput  | 4,031.4 readings/second |
+
+### Test 3: Larger Batches
+
+| Metric              |                  Result |
+| ------------------- | ----------------------: |
+| Readings submitted  |                  10,000 |
+| Successful requests |                      10 |
+| Failed requests     |                       0 |
+| Batch size          |          1,000 readings |
+| Elapsed time        |            2.24 seconds |
+| Request throughput  |     4.5 requests/second |
+| Reading throughput  | 4,457.8 readings/second |
+
+**Interpretation:** All three tests accepted 10,000 readings without failed requests. Batch processing improved reading throughput substantially compared with individual requests.
+
+However, these tests did not demonstrate that the system can process 10,000 readings in one second. Further optimization and testing are needed to establish that performance target.
+
+Results depend on hardware, database state, rule evaluation, and concurrency settings. These are measurements from local test runs, not guaranteed production performance.
+
+### Run the Load Test
+
+Run 10,000 individual requests:
+
+```bash
+py -3.14 load_test.py
+```
+
+Run 10,000 readings in batches of 100:
+
+```bash
+py -3.14 load_test.py --batch-size 100
+```
+
+Run 10,000 readings in batches of 1,000:
+
+```bash
+py -3.14 load_test.py --batch-size 1000 --concurrency 20
+```
 
 ## Architecture
 
+```text
+Sensor Simulator / External Sensor
+                |
+                v
+          HTTP + JSON
+                |
+                v
+          FastAPI Backend
+                |
+                v
+        Input Validation
+                |
+                v
+         Reading Ingestion
+                |
+                v
+          Rule Evaluation
+                |
+                v
+          Alert Generation
+                |
+                v
+           SQLite Database
+                |
+                v
+       Alert Management APIs
 ```
-sensor / simulator / load_test
-          |  HTTP + JSON
-          v
-   FastAPI (main.py)  --- Pydantic validation (camelCase JSON, clear 422 errors)
-          |
-          v
-   one transaction per request (database.py)
-     1. insert reading(s)
-     2. load enabled matching rules
-     3. evaluate each rule
-     4. INSERT OR IGNORE alerts (UNIQUE dedupe_key)
-          |
-          v
-   SQLite file (WAL mode): readings, rules, alerts
-```
 
-Tables: `readings`, `rules`, `alerts`. Indexes cover reading lookups by
-(sensor, type, time), rules by (enabled, type) and alerts by status.
+### Processing Flow
 
-**Alert rules**
+1. The API receives a sensor reading or batch.
+2. The backend validates the incoming data.
+3. Valid readings are stored in SQLite.
+4. Enabled matching alert rules are evaluated.
+5. Alerts are created when rule conditions are satisfied.
+6. Organizers can view, acknowledge, and resolve alerts.
 
-* `threshold`: fires when a single reading satisfies the comparison.
-* `window_average`: after each reading, averages that sensor's readings of the
-  same type in the previous N minutes (up to the new reading's timestamp) and fires
-  if the average satisfies the comparison and at least `minSamples` readings exist.
+## Design Trade-offs
 
-**Duplicate prevention**
+**SQLite:** Easy to configure and provides persistent storage. However, concurrent writes can become a bottleneck because SQLite allows only one writer at a time.
 
-* Threshold alerts: key = rule + reading id.
-* Window alerts: key = rule + sensor + fixed time bucket (epoch / window length),
-  so a sensor produces at most one alert per rule per window bucket.
-* The database enforces this with a `UNIQUE` column, so it also holds under concurrent requests.
+**Batch processing:** Reduces the number of HTTP requests required to submit many readings. The tests showed higher reading throughput with batches than with individual requests.
 
-**Alert lifecycle**: `open` -> `acknowledged` -> `resolved`. Invalid transitions return 409.
+**Synchronous rule evaluation:** Alerts can be created during reading ingestion, making the behavior straightforward to understand. However, evaluating rules during ingestion adds processing time.
 
-## Design trade-offs
+**Alert deduplication:** Prevents repeated alerts for the same rule and deduplication key.
 
-* **SQLite**: zero setup and durable, but only one writer at a time. WAL mode,
-  `BEGIN IMMEDIATE` and a busy timeout make concurrent requests queue politely.
-  For many writes per second or multiple servers, switch to PostgreSQL or a
-  time-series database.
-* **Synchronous evaluation on ingest**: alerts are available as soon as the request
-  returns and logic stays easy to follow, but each request does extra reads and
-  writes. A queue plus background worker would raise throughput at the cost of complexity.
-* **Tumbling-window dedupe**: simple and deterministic, but a sustained problem that
-  crosses a bucket boundary produces a second alert, and an alert that was resolved
-  will not re-fire in the same bucket.
-* **Batch is all-or-nothing**: one bad item rejects the whole batch (clear errors, no
-  partial state). The alternative, partial acceptance, is friendlier for flaky
-  devices but harder to reason about.
-* **No backfill**: a newly created or re-enabled rule only evaluates readings that
-  arrive afterwards.
-* **No authentication**: fine for a learning project, but add API keys or OAuth
-  before exposing it on a real network.
-* **A new SQLite connection per request**: simple and thread-safe; a connection
-  pool would be slightly faster.
-* **Readings are never deleted or compacted**: add a retention job for long-running deployments.
+**Scalability:** A production system handling sustained high-volume traffic could use a message queue, background workers, and a database designed for higher concurrent write throughput.
+
+**Reliability:** Persistent SQLite storage retains application data across normal application restarts. Additional monitoring, backups, and recovery procedures would be needed for production deployment.
+
+## Limitations
+
+* The tested implementation has not demonstrated 10,000 readings per second.
+* SQLite may limit throughput under heavy concurrent write workloads.
+* The project does not include authentication.
+* The load-test results represent local measurements and may differ on other machines.
+
+## Conclusion
+
+Campus Sensor Monitoring and Alerts demonstrates sensor data ingestion, configurable alert rules, automatic alert generation, alert lifecycle management, automated testing, and performance measurement.
+
+The load tests show that batching improves throughput, while also identifying performance limitations that would need to be addressed for a high-volume deployment.
